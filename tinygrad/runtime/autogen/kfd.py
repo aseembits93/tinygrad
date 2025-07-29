@@ -27,40 +27,44 @@ class AsDictMixin:
     @classmethod
     def as_dict(cls, self):
         result = {}
-        if not isinstance(self, AsDictMixin):
+        _isinstance = isinstance
+        _hasattr = hasattr
+        _type = type
+        _getattr = getattr
+
+        if not _isinstance(self, AsDictMixin):
             # not a structure, assume it's already a python object
             return self
-        if not hasattr(cls, "_fields_"):
+        if not _hasattr(cls, "_fields_"):
             return result
-        # sys.version_info >= (3, 5)
-        # for (field, *_) in cls._fields_:  # noqa
+
         for field_tuple in cls._fields_:  # noqa
             field = field_tuple[0]
             if field.startswith('PADDING_'):
                 continue
-            value = getattr(self, field)
-            type_ = type(value)
-            if hasattr(value, "_length_") and hasattr(value, "_type_"):
-                # array
-                if not hasattr(type_, "as_dict"):
-                    value = [v for v in value]
+            value = _getattr(self, field)
+            type_ = _type(value)
+
+            # Optimize the most typical case: another structure (AsDictMixin).
+            if _isinstance(value, AsDictMixin):
+                value = type_.as_dict(value)
+            # Array-like structure.
+            elif _hasattr(value, "_length_") and _hasattr(value, "_type_"):
+                if not _hasattr(type_, "as_dict"):
+                    value = list(value)
                 else:
-                    type_ = type_._type_
-                    value = [type_.as_dict(v) for v in value]
-            elif hasattr(value, "contents") and hasattr(value, "_type_"):
-                # pointer
+                    base_type = type_._type_
+                    value = [base_type.as_dict(v) for v in value]
+            # Pointer-like structure.
+            elif _hasattr(value, "contents") and _hasattr(value, "_type_"):
                 try:
-                    if not hasattr(type_, "as_dict"):
+                    if not _hasattr(type_, "as_dict"):
                         value = value.contents
                     else:
-                        type_ = type_._type_
-                        value = type_.as_dict(value.contents)
+                        base_type = type_._type_
+                        value = base_type.as_dict(value.contents)
                 except ValueError:
-                    # nullptr
                     value = None
-            elif isinstance(value, AsDictMixin):
-                # other structure
-                value = type_.as_dict(value)
             result[field] = value
         return result
 
