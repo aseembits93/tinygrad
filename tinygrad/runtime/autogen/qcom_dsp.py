@@ -22,14 +22,14 @@ class AsDictMixin:
         # for (field, *_) in cls._fields_:  # noqa
         for field_tuple in cls._fields_:  # noqa
             field = field_tuple[0]
-            if field.startswith('PADDING_'):
+            if field[:9] == 'PADDING_':
                 continue
             value = getattr(self, field)
             type_ = type(value)
             if hasattr(value, "_length_") and hasattr(value, "_type_"):
                 # array
                 if not hasattr(type_, "as_dict"):
-                    value = [v for v in value]
+                    value = list(value)
                 else:
                     type_ = type_._type_
                     value = [type_.as_dict(v) for v in value]
