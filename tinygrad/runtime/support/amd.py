@@ -34,14 +34,11 @@ class AMDIP:
 
 def fixup_ip_version(ip:str, version:tuple[int, ...]) -> list[tuple[int, ...]]:
   # override versions
-  def _apply_ovrd(ovrd:dict[tuple[int, ...], tuple[int, ...]]) -> tuple[int, ...]:
-    for ver, ovrd_ver in ovrd.items():
-      if version[:len(ver)] == ver: return ovrd_ver
-    return version
-
-  if ip in ['nbio', 'nbif']: version = _apply_ovrd({(3,3): (2,3,0)})
-  elif ip in ['mp', 'smu']: version = _apply_ovrd({(14,0,3): (14,0,2)})
-  elif ip in ['gc']: version = _apply_ovrd({(9,5,0): (9,4,3)})
+  ovrd = _OVRD_MAP.get(ip)
+  if ovrd is not None:
+    ver, ovrd_ver = ovrd
+    if version[:len(ver)] == ver:
+      version = ovrd_ver
 
   return [version, version[:2], version[:2]+(0,), version[:1]+(0, 0)]
 
@@ -129,3 +126,11 @@ def setup_pci_bars(usb:ASM24Controller, gpu_bus:int, mem_base:int, pref_mem_base
 
   usb.pcie_cfg_req(pci.PCI_COMMAND, bus=gpu_bus, dev=0, fn=0, value=pci.PCI_COMMAND_IO | pci.PCI_COMMAND_MEMORY | pci.PCI_COMMAND_MASTER, size=1)
   return bars
+
+_OVRD_MAP = {
+    'nbio': ((3, 3), (2, 3, 0)),
+    'nbif': ((3, 3), (2, 3, 0)),
+    'mp':   ((14, 0, 3), (14, 0, 2)),
+    'smu':  ((14, 0, 3), (14, 0, 2)),
+    'gc':   ((9, 5, 0), (9, 4, 3)),
+}
