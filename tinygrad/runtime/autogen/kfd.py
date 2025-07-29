@@ -204,7 +204,7 @@ KFD_DBG_QUEUE_ERROR_MASK = (1<<30) # macro
 KFD_DBG_QUEUE_INVALID_MASK = (1<<31) # macro
 AMDKFD_IOCTL_BASE = 'K' # macro
 def AMDKFD_IO(nr):  # macro
-   return _IO('K',nr)
+  return functools.partial(_do_ioctl, 0, 75, nr, None)
 def AMDKFD_IOR(nr, type):  # macro
    return _IOR('K',nr,type)
 def AMDKFD_IOW(nr, type):  # macro
