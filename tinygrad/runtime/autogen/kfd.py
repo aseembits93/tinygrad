@@ -6,7 +6,7 @@
 # POINTER_SIZE is: 8
 # LONGDOUBLE_SIZE is: 16
 #
-import ctypes, os
+import ctypes
 
 
 
@@ -1061,7 +1061,9 @@ def KFD_DBG_EC_TYPE_IS_QUEUE(ecode):  # macro
 def KFD_DBG_EC_TYPE_IS_DEVICE(ecode):  # macro
    return (KFD_DBG_EC_IS_VALID(ecode) and not not (KFD_EC_MASK(ecode)&(KFD_EC_MASK(EC_DEVICE_QUEUE_DELETE)|KFD_EC_MASK(EC_DEVICE_RAS_ERROR)|KFD_EC_MASK(EC_DEVICE_FATAL_HALT)|KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)|KFD_EC_MASK(EC_DEVICE_NEW))))
 def KFD_DBG_EC_TYPE_IS_PROCESS(ecode):  # macro
-   return (KFD_DBG_EC_IS_VALID(ecode) and not not (KFD_EC_MASK(ecode)&(KFD_EC_MASK(EC_PROCESS_RUNTIME)|KFD_EC_MASK(EC_PROCESS_DEVICE_REMOVE))))
+  if not (ecode>0 and ecode<50):
+      return False
+  return (1<<(ecode-1))&_PROCESS_TYPE_MASK != 0
 def KFD_DBG_EC_TYPE_IS_PACKET(ecode):  # macro
    return (KFD_DBG_EC_IS_VALID(ecode) and not not (KFD_EC_MASK(ecode)&(KFD_EC_MASK(EC_QUEUE_PACKET_DISPATCH_DIM_INVALID)|KFD_EC_MASK(EC_QUEUE_PACKET_DISPATCH_GROUP_SEGMENT_SIZE_INVALID)|KFD_EC_MASK(EC_QUEUE_PACKET_DISPATCH_CODE_INVALID)|KFD_EC_MASK(EC_QUEUE_PACKET_RESERVED)|KFD_EC_MASK(EC_QUEUE_PACKET_UNSUPPORTED)|KFD_EC_MASK(EC_QUEUE_PACKET_DISPATCH_WORK_GROUP_SIZE_INVALID)|KFD_EC_MASK(EC_QUEUE_PACKET_DISPATCH_REGISTER_INVALID)|KFD_EC_MASK(EC_QUEUE_PACKET_VENDOR_UNSUPPORTED))))
 
@@ -1546,3 +1548,5 @@ __all__ = \
     'struct_kfd_process_device_apertures',
     'struct_kfd_queue_snapshot_entry', 'struct_kfd_runtime_info',
     'union_kfd_event_data_0', 'union_kfd_ioctl_dbg_trap_args_0']
+
+_PROCESS_TYPE_MASK = (1<<(48-1))|(1<<(49-1))
