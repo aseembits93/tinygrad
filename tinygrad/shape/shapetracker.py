@@ -70,6 +70,7 @@ class ShapeTracker:
     return ShapeTracker(tuple(inverted_views)).reshape(out_shape)
 
   @staticmethod
+  @functools.cache
   def from_shape(shape:tuple[sint, ...], strides:tuple[sint, ...]|None=None) -> ShapeTracker: return ShapeTracker((View.create(shape, strides),))
 
   @property
