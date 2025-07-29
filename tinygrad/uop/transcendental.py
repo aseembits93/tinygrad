@@ -146,7 +146,29 @@ def cody_waite_reduction(d:UOp) -> tuple[UOp, UOp]:
   return _reduce_d(d, quadrant.cast(d.dtype)), quadrant.cast_vec(dtypes.int32)
 
 # *** approximate sine on small angle. ***
-def trig_poly(d:UOp, coeff32, coeff64): return d * (polyN(d*d, coeff64) if d.dtype.scalar() == dtypes.float64 else polyN(d*d, coeff32))
+def trig_poly(d:UOp, coeff32, coeff64): 
+  dd = d*d
+  if d.dtype.scalar() == dtypes.float64:
+    # Inlined Horner's method for float64 coefficients
+    return d * (((((((((
+      -7.97255955009037868891952e-18 * dd + 
+      2.81009972710863200091251e-15) * dd + 
+      -7.64712219118158833288484e-13) * dd + 
+      1.60590430605664501629054e-10) * dd + 
+      -2.50521083763502045810755e-08) * dd + 
+      2.75573192239198747630416e-06) * dd + 
+      -0.000198412698412696162806809) * dd + 
+      0.00833333333333332974823815) * dd + 
+      -0.166666666666666657414808) * dd + 
+      1.0)
+  else:
+    # Inlined Horner's method for float32 coefficients
+    return d * ((((
+      2.6083159809786593541503e-06 * dd + 
+      -0.0001981069071916863322258) * dd + 
+      0.00833307858556509017944336) * dd + 
+      -0.166666597127914428710938) * dd + 
+      1.0)
 # approximate sine on [-pi/2, pi/2]
 def sin_poly(d:UOp) -> UOp:
   return trig_poly(d, [2.6083159809786593541503e-06, -0.0001981069071916863322258, 0.00833307858556509017944336, -0.166666597127914428710938, 1.0],
