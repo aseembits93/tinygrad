@@ -210,7 +210,7 @@ def AMDKFD_IOR(nr, type):  # macro
 def AMDKFD_IOW(nr, type):  # macro
    return _IOW('K',nr,type)
 def AMDKFD_IOWR(nr, type):  # macro
-   return _IOWR('K',nr,type)
+  return functools.partial(_do_ioctl, 3, 75, nr, type)
 AMDKFD_COMMAND_START = 0x01 # macro
 AMDKFD_COMMAND_END = 0x27 # macro
 class struct_kfd_ioctl_get_version_args(Structure):
