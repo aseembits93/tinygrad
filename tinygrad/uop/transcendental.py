@@ -12,7 +12,7 @@ def _lazy_map_numbers(x:UOp, inf:UOp, _inf:UOp, nan:UOp, ratio:UOp):
 # *** helper functions for bit manipulation ***
 def mantissa_bits(d:DType) -> int: return dtypes.finfo(d.scalar())[1]
 def exponent_bias(d:DType) -> int: return {dtypes.float64: 1023, dtypes.float32: 127, dtypes.float16: 15}[d.scalar()]
-def exponent_mask(d:DType) -> int: return {dtypes.float64: 2047, dtypes.float32: 255, dtypes.float16: 31}[d.scalar()]
+def exponent_mask(d:DType) -> int: return _EXP_MASKS[d.scalar()]
 
 # **** utils ****
 def shr(x:UOp, y:int) -> UOp: return x // (2**y)
@@ -264,3 +264,5 @@ def xpow(base:UOp, exponent:UOp) -> UOp:
     (exponent < 0).where(-exponent, exponent).cast_vec(dtypes.int32).mod(2).cast_vec(dtypes.bool).where(ret.const_like(-1), ret.const_like(1)))
   # fix 0 ** 0 = 1
   return (base.eq(0) & exponent.eq(0)).where(ret.const_like(1), ret * (base < 0).where(adj, ret.const_like(1)))
+
+_EXP_MASKS = {dtypes.float64: 2047, dtypes.float32: 255, dtypes.float16: 31}
