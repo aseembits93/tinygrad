@@ -82,7 +82,15 @@ class WGSLRenderer(CStyleLanguage):
   def render_cast(self, dt:DType, val: str) -> str: return f"{self.type_map[dt]}({val})"
   def render_dtype(self, dt:DType, mutable=True) -> str: return "var"
   def render_load(self, x:str, dt:DType) -> str: return f"atomicLoad(&{x})" if is_packed(dt) else x
-  def buf_map(self, dt:DType) -> str: return "atomic<u32>" if is_packed(dt) else self.type_map[dt.base]
+  def buf_map(self, dt:DType) -> str:
+    # Localize attribute access
+    dt_base = dt.base
+    dt_itemsize = dt.itemsize
+    if dt_itemsize < 4 and dt_base is not dtypes.half:
+      # deref dt as PtrDType only if likely (avoid isinstance unless necessary)
+      if not (isinstance(dt, PtrDType) and dt.addrspace == AddrSpace.REG):
+        return "atomic<u32>"
+    return self.type_map[dt_base]
   def render_kernel(self, function_name:str, kernel:list[str], bufs:list[tuple[str,tuple[DType,bool]]], uops:list[UOp], prefix=None) -> str:
     local_size = [num for _, num in sorted([u.arg for u in uops if u.op is Ops.SPECIAL and u.arg[0][0] == 'l'], key=lambda x: x[0])]
     if not local_size: local_size = [1]
