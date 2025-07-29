@@ -299,3 +299,5 @@ def _to_torch_dtype(dtype:DType) -> 'torch.dtype'|None:  # type: ignore [name-de
 @functools.cache
 def _from_torch_dtype(torchdtype:'torch.dtype') -> DType: # type: ignore [name-defined] # noqa: F821
   return {v:k for k in dtypes.all if (v:=_to_torch_dtype(k)) is not None}[torchdtype]
+
+_EXPONENT_BIAS_MAP = {dtypes.float64: 1023, dtypes.float32: 127, dtypes.float16: 15}
