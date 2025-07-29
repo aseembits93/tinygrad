@@ -29,7 +29,7 @@ class AsDictMixin:
             if hasattr(value, "_length_") and hasattr(value, "_type_"):
                 # array
                 if not hasattr(type_, "as_dict"):
-                    value = [v for v in value]
+                    value = list(value)
                 else:
                     type_ = type_._type_
                     value = [type_.as_dict(v) for v in value]
