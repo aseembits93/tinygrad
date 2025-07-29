@@ -13,7 +13,8 @@ from tinygrad.renderer import Renderer
 
 def _load(m, i):
   if i is None: return 0.0
-  if i < 0 or i >= len(m): raise IndexError(f"load out of bounds, size is {len(m)} and access is {i}")
+  ml = len(m)
+  if i < 0 or i >= ml: raise IndexError("load out of bounds")
   return m[i]
 
 def load(inp, j=0):
