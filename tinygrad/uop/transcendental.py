@@ -15,7 +15,9 @@ def exponent_bias(d:DType) -> int: return {dtypes.float64: 1023, dtypes.float32:
 def exponent_mask(d:DType) -> int: return {dtypes.float64: 2047, dtypes.float32: 255, dtypes.float16: 31}[d.scalar()]
 
 # **** utils ****
-def shr(x:UOp, y:int) -> UOp: return x // (2**y)
+def shr(x:UOp, y:int) -> UOp:
+  # use table lookup if y in common range, else fallback
+  return x // (_pow2[y] if 0 <= y < len(_pow2) else 2**y)
 def shl(x:UOp, y:int) -> UOp: return x * (2**y)
 
 def rintk(d:UOp) -> UOp:
@@ -264,3 +266,5 @@ def xpow(base:UOp, exponent:UOp) -> UOp:
     (exponent < 0).where(-exponent, exponent).cast_vec(dtypes.int32).mod(2).cast_vec(dtypes.bool).where(ret.const_like(-1), ret.const_like(1)))
   # fix 0 ** 0 = 1
   return (base.eq(0) & exponent.eq(0)).where(ret.const_like(1), ret * (base < 0).where(adj, ret.const_like(1)))
+
+_pow2 = [1<<i for i in range(65)]
