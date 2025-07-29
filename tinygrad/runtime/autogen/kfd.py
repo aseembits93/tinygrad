@@ -20,7 +20,10 @@ def _do_ioctl(__idir, __base, __nr, __user_struct, __fd:FileIOInterface, **kwarg
 
 def _IO(base, nr): return functools.partial(_do_ioctl, 0, ord(base) if isinstance(base, str) else base, nr, None)
 def _IOW(base, nr, type): return functools.partial(_do_ioctl, 1, ord(base) if isinstance(base, str) else base, nr, type)
-def _IOR(base, nr, type): return functools.partial(_do_ioctl, 2, ord(base) if isinstance(base, str) else base, nr, type)
+def _IOR(base, nr, type):
+  def inner(__fd: FileIOInterface, **kwargs):
+    return _do_ioctl(2, ord(base) if isinstance(base, str) else base, nr, type, __fd, **kwargs)
+  return inner
 def _IOWR(base, nr, type): return functools.partial(_do_ioctl, 3, ord(base) if isinstance(base, str) else base, nr, type)
 
 class AsDictMixin:
