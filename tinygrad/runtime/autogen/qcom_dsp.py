@@ -7,6 +7,8 @@
 # LONGDOUBLE_SIZE is: 16
 #
 import ctypes
+import fcntl
+import functools
 
 
 class AsDictMixin:
@@ -119,6 +121,67 @@ class Union(ctypes.Union, AsDictMixin):
 
 
 import fcntl, functools
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
+pass
 
 def _do_ioctl(__idir, __base, __nr, __user_struct, __fd, *args, **kwargs):
   ret = fcntl.ioctl(__fd, (__idir<<30) | (ctypes.sizeof(made := __user_struct(*args, **kwargs))<<16) | (__base<<8) | __nr, made)
@@ -422,10 +485,10 @@ FASTRPC_GLINK_GUID = "fastrpcglink-apps-dsp" # macro
 FASTRPC_SMD_GUID = "fastrpcsmd-apps-dsp" # macro
 DEVICE_NAME = "adsprpc-smd" # macro
 FASTRPC_ATTR_NOVA = 0x1 # macro
-FASTRPC_ATTR_NON_COHERENT = 0x2 # macro
-FASTRPC_ATTR_COHERENT = 0x4 # macro
-FASTRPC_ATTR_KEEP_MAP = 0x8 # macro
-FASTRPC_ATTR_NOMAP = (16) # macro
+FASTRPC_ATTR_NON_COHERENT = 2 # macro
+FASTRPC_ATTR_COHERENT = 4 # macro
+FASTRPC_ATTR_KEEP_MAP = 8 # macro
+FASTRPC_ATTR_NOMAP = 16 # macro
 FASTRPC_MODE_PARALLEL = 0 # macro
 FASTRPC_MODE_SERIAL = 1 # macro
 FASTRPC_MODE_PROFILE = 2 # macro
@@ -443,7 +506,7 @@ def REMOTE_SCALARS_INHANDLES(dwScalars):  # macro
 def REMOTE_SCALARS_OUTHANDLES(dwScalars):  # macro
    return ((dwScalars)&0x0f)
 def REMOTE_SCALARS_LENGTH(sc):  # macro
-   return (REMOTE_SCALARS_INBUFS(sc)+REMOTE_SCALARS_OUTBUFS(sc)+REMOTE_SCALARS_INHANDLES(sc)+REMOTE_SCALARS_OUTHANDLES(sc))
+    return (((sc)>>16)&0x0ff)+(((sc)>>8)&0x0ff)+(((sc)>>4)&0x0f)+((sc)&0x0f)
 def REMOTE_SCALARS_MAKEX(nAttr, nMethod, nIn, nOut, noIn, noOut):  # macro
    return ((((nAttr)&0x7)<<29)|(((nMethod)&0x1f)<<24)|(((nIn)&0xff)<<16)|(((nOut)&0xff)<<8)|(((noIn)&0x0f)<<4)|((noOut)&0x0f))
 def REMOTE_SCALARS_MAKE(nMethod, nIn, nOut):  # macro
