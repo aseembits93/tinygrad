@@ -81,51 +81,78 @@ def import_asic_regs(prefix:str, version:tuple[int, ...], cls=AMDReg) -> dict[st
   raise ImportError(f"Failed to load ASIC registers for {prefix.upper()} {'.'.join(map(str, version))}")
 
 def setup_pci_bars(usb:ASM24Controller, gpu_bus:int, mem_base:int, pref_mem_base:int) -> dict[int, tuple[int, int]]:
+  # Pre-compute constants
+  command_flags = pci.PCI_COMMAND_IO | pci.PCI_COMMAND_MEMORY | pci.PCI_COMMAND_MASTER
+  mem_base_high = (mem_base >> 16) & 0xffff
+  pref_mem_base_high = (pref_mem_base >> 16) & 0xffff
+  pref_mem_base_upper = pref_mem_base >> 32
+  max16 = 0xffff
+  max32 = 0xffffffff
+  mem_limit_high = max16
+  pref_mem_limit_high = max16
+  pref_limit_upper = max32
+
+  pcie_cfg_req = usb.pcie_cfg_req  # Reduce attribute lookup overhead
+
+  # Set up buses
   for bus in range(gpu_bus):
-    # All 3 values must be written at the same time.
-    buses = (0 << 0) | ((bus+1) << 8) | ((gpu_bus) << 16)
-    usb.pcie_cfg_req(pci.PCI_PRIMARY_BUS, bus=bus, dev=0, fn=0, value=buses, size=4)
+    buses = ((bus+1) << 8) | (gpu_bus << 16)
+    pcie_cfg_req(pci.PCI_PRIMARY_BUS, bus=bus, dev=0, fn=0, value=buses, size=4)
 
-    usb.pcie_cfg_req(pci.PCI_MEMORY_BASE, bus=bus, dev=0, fn=0, value=(mem_base>>16) & 0xffff, size=2)
-    usb.pcie_cfg_req(pci.PCI_MEMORY_LIMIT, bus=bus, dev=0, fn=0, value=0xffff, size=2)
-    usb.pcie_cfg_req(pci.PCI_PREF_MEMORY_BASE, bus=bus, dev=0, fn=0, value=(pref_mem_base>>16) & 0xffff, size=2)
-    usb.pcie_cfg_req(pci.PCI_PREF_MEMORY_LIMIT, bus=bus, dev=0, fn=0, value=0xffff, size=2)
-    usb.pcie_cfg_req(pci.PCI_PREF_BASE_UPPER32,  bus=bus, dev=0, fn=0, value=pref_mem_base >> 32, size=4)
-    usb.pcie_cfg_req(pci.PCI_PREF_LIMIT_UPPER32, bus=bus, dev=0, fn=0, value=0xffffffff, size=4)
+    pcie_cfg_req(pci.PCI_MEMORY_BASE, bus=bus, dev=0, fn=0, value=mem_base_high, size=2)
+    pcie_cfg_req(pci.PCI_MEMORY_LIMIT, bus=bus, dev=0, fn=0, value=mem_limit_high, size=2)
+    pcie_cfg_req(pci.PCI_PREF_MEMORY_BASE, bus=bus, dev=0, fn=0, value=pref_mem_base_high, size=2)
+    pcie_cfg_req(pci.PCI_PREF_MEMORY_LIMIT, bus=bus, dev=0, fn=0, value=pref_mem_limit_high, size=2)
+    pcie_cfg_req(pci.PCI_PREF_BASE_UPPER32,  bus=bus, dev=0, fn=0, value=pref_mem_base_upper, size=4)
+    pcie_cfg_req(pci.PCI_PREF_LIMIT_UPPER32, bus=bus, dev=0, fn=0, value=pref_limit_upper, size=4)
 
-    usb.pcie_cfg_req(pci.PCI_COMMAND, bus=bus, dev=0, fn=0, value=pci.PCI_COMMAND_IO | pci.PCI_COMMAND_MEMORY | pci.PCI_COMMAND_MASTER, size=1)
+    pcie_cfg_req(pci.PCI_COMMAND, bus=bus, dev=0, fn=0, value=command_flags, size=1)
 
   # resize bar 0
   cap_ptr = 0x100
   while cap_ptr:
-    if pci.PCI_EXT_CAP_ID(hdr:=usb.pcie_cfg_req(cap_ptr, bus=gpu_bus, dev=0, fn=0, size=4)) == pci.PCI_EXT_CAP_ID_REBAR:
-      cap = usb.pcie_cfg_req(cap_ptr + 0x04, bus=gpu_bus, dev=0, fn=0, size=4)
-      new_ctrl = (usb.pcie_cfg_req(cap_ptr + 0x08, bus=gpu_bus, dev=0, fn=0, size=4) & ~0x1F00) | ((int(cap >> 4).bit_length() - 1) << 8)
-      usb.pcie_cfg_req(cap_ptr + 0x08, bus=gpu_bus, dev=0, fn=0, value=new_ctrl, size=4)
-
+    hdr = pcie_cfg_req(cap_ptr, bus=gpu_bus, dev=0, fn=0, size=4)
+    if pci.PCI_EXT_CAP_ID(hdr) == pci.PCI_EXT_CAP_ID_REBAR:
+      cap = pcie_cfg_req(cap_ptr + 0x04, bus=gpu_bus, dev=0, fn=0, size=4)
+      new_ctrl = (pcie_cfg_req(cap_ptr + 0x08, bus=gpu_bus, dev=0, fn=0, size=4) & ~0x1F00) | \
+                ((int(cap >> 4).bit_length() - 1) << 8)
+      pcie_cfg_req(cap_ptr + 0x08, bus=gpu_bus, dev=0, fn=0, value=new_ctrl, size=4)
     cap_ptr = pci.PCI_EXT_CAP_NEXT(hdr)
 
-  mem_space_addr, bar_off, bars = [mem_base, pref_mem_base], 0, {}
+  mem_space_addr = [mem_base, pref_mem_base]
+  bar_off = 0
+  bars = {}
+  addr_0 = pci.PCI_BASE_ADDRESS_0
   while bar_off < 24:
-    cfg = usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off, bus=gpu_bus, dev=0, fn=0, size=4)
-    bar_mem, bar_64 = bool(cfg & pci.PCI_BASE_ADDRESS_MEM_PREFETCH), cfg & pci.PCI_BASE_ADDRESS_MEM_TYPE_64
+    cfg = pcie_cfg_req(addr_0 + bar_off, bus=gpu_bus, dev=0, fn=0, size=4)
+    bar_mem = bool(cfg & pci.PCI_BASE_ADDRESS_MEM_PREFETCH)
+    bar_64 = cfg & pci.PCI_BASE_ADDRESS_MEM_TYPE_64
 
     if (cfg & pci.PCI_BASE_ADDRESS_SPACE) == pci.PCI_BASE_ADDRESS_SPACE_MEMORY:
-      usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off, bus=gpu_bus, dev=0, fn=0, value=0xffffffff, size=4)
-      lo = (usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off, bus=gpu_bus, dev=0, fn=0, size=4) & 0xfffffff0)
+      # Save register calculation and attribute lookup
+      offs = addr_0 + bar_off
+      # - Write all-ones to determine BAR size
+      pcie_cfg_req(offs, bus=gpu_bus, dev=0, fn=0, value=max32, size=4)
+      lo = pcie_cfg_req(offs, bus=gpu_bus, dev=0, fn=0, size=4) & 0xfffffff0
 
-      if bar_64: usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off + 4, bus=gpu_bus, dev=0, fn=0, value=0xffffffff, size=4)
-      hi = (usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off + 4, bus=gpu_bus, dev=0, fn=0, size=4) if bar_64 else 0)
+      if bar_64:
+        offs_hi = offs + 4
+        pcie_cfg_req(offs_hi, bus=gpu_bus, dev=0, fn=0, value=max32, size=4)
+        hi = pcie_cfg_req(offs_hi, bus=gpu_bus, dev=0, fn=0, size=4)
+      else:
+        hi = 0
 
       bar_size = ((~(((hi << 32) | lo) & ~0xf)) + 1) & (0xffffffffffffffff if bar_64 else 0xffffffff)
 
-      usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off, bus=gpu_bus, dev=0, fn=0, value=mem_space_addr[bar_mem] & 0xffffffff, size=4)
-      if bar_64: usb.pcie_cfg_req(pci.PCI_BASE_ADDRESS_0 + bar_off + 4, bus=gpu_bus, dev=0, fn=0, value=mem_space_addr[bar_mem] >> 32, size=4)
-
+      val_low = mem_space_addr[bar_mem] & 0xffffffff
+      pcie_cfg_req(offs, bus=gpu_bus, dev=0, fn=0, value=val_low, size=4)
+      if bar_64:
+        val_high = mem_space_addr[bar_mem] >> 32
+        pcie_cfg_req(offs + 4, bus=gpu_bus, dev=0, fn=0, value=val_high, size=4)
       bars[bar_off // 4] = (mem_space_addr[bar_mem], bar_size)
       mem_space_addr[bar_mem] += round_up(bar_size, 2 << 20)
 
     bar_off += 8 if bar_64 else 4
 
-  usb.pcie_cfg_req(pci.PCI_COMMAND, bus=gpu_bus, dev=0, fn=0, value=pci.PCI_COMMAND_IO | pci.PCI_COMMAND_MEMORY | pci.PCI_COMMAND_MASTER, size=1)
+  pcie_cfg_req(pci.PCI_COMMAND, bus=gpu_bus, dev=0, fn=0, value=command_flags, size=1)
   return bars
