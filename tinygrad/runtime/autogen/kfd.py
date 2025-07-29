@@ -70,9 +70,13 @@ class Structure(ctypes.Structure, AsDictMixin):
     def __init__(self, *args, **kwds):
         # We don't want to use positional arguments fill PADDING_* fields
 
-        args = dict(zip(self.__class__._field_names_(), args))
-        args.update(kwds)
-        super(Structure, self).__init__(**args)
+        # Optimization: Only build dict if args is not empty.
+        if args:
+            args = dict(zip(self.__class__._field_names_(), args))
+            args.update(kwds)
+            super(Structure, self).__init__(**args)
+        else:
+            super(Structure, self).__init__(**kwds)
 
     @classmethod
     def _field_names_(cls):
@@ -91,34 +95,38 @@ class Structure(ctypes.Structure, AsDictMixin):
     @classmethod
     def bind(cls, bound_fields):
         fields = {}
-        for name, type_ in cls._fields_:
+        # Optimization: Avoid repeated pop/lookup in bound_fields
+        pop = bound_fields.pop  # localize for quicker access
+        _fields_ = cls._fields_
+        # For exception: hold original keys before modification
+        orig_keys = set(bound_fields)
+        for name, type_ in _fields_:
             if hasattr(type_, "restype"):
-                if name in bound_fields:
-                    if bound_fields[name] is None:
-                        fields[name] = type_()
-                    else:
-                        # use a closure to capture the callback from the loop scope
-                        fields[name] = (
-                            type_((lambda callback: lambda *args: callback(*args))(
-                                bound_fields[name]))
-                        )
-                    del bound_fields[name]
+                val = pop(name, None)
+                if val is not None:
+                    # No need for closure constructor: direct lambda
+                    fields[name] = type_(lambda *args, callback=val: callback(*args))
+                elif name in orig_keys:  # was present, popped to None
+                    fields[name] = type_()
                 else:
                     # default callback implementation (does nothing)
+                    # Optimization: minimize except overhead
                     try:
                         default_ = type_(0).restype().value
                     except TypeError:
                         default_ = None
-                    fields[name] = type_((
-                        lambda default_: lambda *args: default_)(default_))
+                    fields[name] = type_(lambda *args, value=default_: value)
             else:
-                # not a callback function, use default initialization
-                if name in bound_fields:
-                    fields[name] = bound_fields[name]
-                    del bound_fields[name]
-                else:
+                val = pop(name, None)
+                if val is not None:
+                    fields[name] = val
+                elif name in orig_keys:  # present, but value is None
                     fields[name] = type_()
-        if len(bound_fields) != 0:
+                else:
+                    # Default initialization for all else
+                    fields[name] = type_()
+        # Check if any keys in bound_fields remain after pop (no need to call len())
+        if bound_fields:
             raise ValueError(
                 "Cannot bind the following unknown callback(s) {}.{}".format(
                     cls.__name__, bound_fields.keys()
