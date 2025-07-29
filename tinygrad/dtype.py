@@ -4,6 +4,9 @@ import math, struct, ctypes, functools
 from dataclasses import dataclass, fields
 from tinygrad.helpers import getenv, prod
 from enum import Enum, auto
+from functools import lru_cache
+import torch
+import numpy as np
 
 ConstType = float|int|bool
 
@@ -293,9 +296,23 @@ def _from_np_dtype(npdtype:'np.dtype') -> DType: # type: ignore [name-defined] #
 @functools.cache
 def _to_torch_dtype(dtype:DType) -> 'torch.dtype'|None:  # type: ignore [name-defined] # noqa: F821
   import numpy as np, torch
+  assert dtypes.is_float(dtypes.default_float), f"{env_default_float} is not a float dtype"
+  
+  truncate: dict[DType, Callable] = {dtypes.bool: bool,
+    dtypes.float16: truncate_fp16, dtypes.bfloat16: truncate_bf16,
+    **{fp8: (lambda x, dtype=fp8: fp8_to_float(float_to_fp8(x, dtype), dtype)) for fp8 in dtypes.fp8s},
+    dtypes.float32: lambda x: ctypes.c_float(x).value, dtypes.float64: lambda x: ctypes.c_double(x).value,
+    dtypes.uint8: lambda x: ctypes.c_uint8(x).value, dtypes.uint16: lambda x: ctypes.c_uint16(x).value,
+    dtypes.uint32: lambda x: ctypes.c_uint32(x).value, dtypes.uint64: lambda x: ctypes.c_uint64(x).value,
+    dtypes.int8: lambda x: ctypes.c_int8(x).value, dtypes.int16: lambda x: ctypes.c_int16(x).value, dtypes.int32: lambda x: ctypes.c_int32(x).value,
+    dtypes.int64: lambda x: ctypes.c_int64(x).value}
   # NOTE: torch doesn't expose this mapping with a stable API
   try: return torch.from_numpy(np.array([], dtype=_to_np_dtype(dtype))).dtype
   except TypeError: return None
 @functools.cache
 def _from_torch_dtype(torchdtype:'torch.dtype') -> DType: # type: ignore [name-defined] # noqa: F821
   return {v:k for k in dtypes.all if (v:=_to_torch_dtype(k)) is not None}[torchdtype]
+
+@lru_cache(maxsize=8)
+def _cached_mantissa_bits(d_scalar):
+  return dtypes.finfo(d_scalar)[1]
