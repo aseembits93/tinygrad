@@ -2,6 +2,7 @@ import math
 from tinygrad.dtype import dtypes, DType
 from tinygrad.helpers import polyN
 from tinygrad.uop.ops import UOp
+from functools import lru_cache
 
 TRANSCENDENTAL_SUPPORTED_DTYPES = (dtypes.float16, dtypes.float32, dtypes.float64)
 
@@ -10,7 +11,7 @@ def _lazy_map_numbers(x:UOp, inf:UOp, _inf:UOp, nan:UOp, ratio:UOp):
   return x.ne(math.inf).where(x.ne(x).where(nan, x.ne(-math.inf).where(ratio, _inf)), inf)
 
 # *** helper functions for bit manipulation ***
-def mantissa_bits(d:DType) -> int: return dtypes.finfo(d.scalar())[1]
+def mantissa_bits(d:DType) -> int: return _cached_mantissa_bits(d.scalar())
 def exponent_bias(d:DType) -> int: return {dtypes.float64: 1023, dtypes.float32: 127, dtypes.float16: 15}[d.scalar()]
 def exponent_mask(d:DType) -> int: return {dtypes.float64: 2047, dtypes.float32: 255, dtypes.float16: 31}[d.scalar()]
 
@@ -264,3 +265,7 @@ def xpow(base:UOp, exponent:UOp) -> UOp:
     (exponent < 0).where(-exponent, exponent).cast_vec(dtypes.int32).mod(2).cast_vec(dtypes.bool).where(ret.const_like(-1), ret.const_like(1)))
   # fix 0 ** 0 = 1
   return (base.eq(0) & exponent.eq(0)).where(ret.const_like(1), ret * (base < 0).where(adj, ret.const_like(1)))
+
+@lru_cache(maxsize=8)
+def _cached_mantissa_bits(d_scalar):
+  return dtypes.finfo(d_scalar)[1]
