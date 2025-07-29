@@ -15,9 +15,12 @@ def magicgu(vmax:int, d:int) -> tuple[int,int]:
   # calculate m,s such that x//d == (x*m) >> s for all 0 <= x <= vmax, d>0; adapted from Hacker's Delight, Chapter 10
   nc = (vmax+1)//(d) * d - 1
   nbits = vmax.bit_length()
+  d_minus1 = d - 1
   for s in range(0, 2*nbits + 1):
-    if 2**s > nc*(d - 1 - (2**s - 1) % d):
-      m = (2**s + d - 1 - (2**s - 1) % d)//d
+    pow2s = 1 << s
+    mod = (pow2s - 1) % d
+    if pow2s > nc*(d_minus1 - mod):
+      m = (pow2s + d_minus1 - mod)//d
       return m, s
   assert False
 
