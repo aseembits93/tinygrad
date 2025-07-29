@@ -19,7 +19,9 @@ def _do_ioctl(__idir, __base, __nr, __user_struct, __fd:FileIOInterface, **kwarg
   return made
 
 def _IO(base, nr): return functools.partial(_do_ioctl, 0, ord(base) if isinstance(base, str) else base, nr, None)
-def _IOW(base, nr, type): return functools.partial(_do_ioctl, 1, ord(base) if isinstance(base, str) else base, nr, type)
+def _IOW(base, nr, type):
+  base_val = ord(base) if isinstance(base, str) else base
+  return lambda __fd, **kwargs: _do_ioctl(1, base_val, nr, type, __fd, **kwargs)
 def _IOR(base, nr, type): return functools.partial(_do_ioctl, 2, ord(base) if isinstance(base, str) else base, nr, type)
 def _IOWR(base, nr, type): return functools.partial(_do_ioctl, 3, ord(base) if isinstance(base, str) else base, nr, type)
 
