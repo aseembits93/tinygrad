@@ -6,7 +6,7 @@
 # POINTER_SIZE is: 8
 # LONGDOUBLE_SIZE is: 16
 #
-import ctypes, os
+import ctypes
 
 
 
@@ -206,7 +206,9 @@ AMDKFD_IOCTL_BASE = 'K' # macro
 def AMDKFD_IO(nr):  # macro
    return _IO('K',nr)
 def AMDKFD_IOR(nr, type):  # macro
-   return _IOR('K',nr,type)
+   def wrapper(*args, **kwargs):
+     return _do_ioctl(2, 75, nr, type, *args, **kwargs)
+   return wrapper
 def AMDKFD_IOW(nr, type):  # macro
    return _IOW('K',nr,type)
 def AMDKFD_IOWR(nr, type):  # macro
