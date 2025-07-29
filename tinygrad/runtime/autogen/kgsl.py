@@ -129,12 +129,21 @@ else:
 import fcntl, functools
 
 def _do_ioctl(__idir, __base, __nr, __user_struct, __fd, __payload=None, **kwargs):
-  ret = __fd.ioctl((__idir<<30) | (ctypes.sizeof(made := (__payload or __user_struct(**kwargs)))<<16) | (__base<<8) | __nr, made)
-  if ret != 0: raise RuntimeError(f"ioctl returned {ret}")
-  return made
+    if __payload is not None:
+        made = __payload
+    else:
+        made = __user_struct(**kwargs)
+    size = ctypes.sizeof(made)
+    code = (__idir<<30) | (size<<16) | (__base<<8) | __nr
+    ret = __fd.ioctl(code, made)
+    if ret != 0:
+        raise RuntimeError(f"ioctl returned {ret}")
+    return made
 
 def _IO(base, nr): return functools.partial(_do_ioctl, 0, ord(base) if isinstance(base, str) else base, nr, None)
-def _IOW(base, nr, type): return functools.partial(_do_ioctl, 1, ord(base) if isinstance(base, str) else base, nr, type)
+def _IOW(base, nr, type):
+    b = ord(base) if isinstance(base, str) else base
+    return lambda __fd, __payload=None, **kwargs: _do_ioctl(1, b, nr, type, __fd, __payload, **kwargs)
 def _IOR(base, nr, type): return functools.partial(_do_ioctl, 2, ord(base) if isinstance(base, str) else base, nr, type)
 def _IOWR(base, nr, type): return functools.partial(_do_ioctl, 3, ord(base) if isinstance(base, str) else base, nr, type)
 
